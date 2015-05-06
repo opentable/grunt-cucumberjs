@@ -60,7 +60,7 @@ cucumberjs: {
 $ grunt cucumberjs
 
 #you can override options via the cli
-$ grunt cucumberjs --features=features/myFeature.feature --format=pretty
+$ grunt cucumberjs --require=test/functional/step_definitions/ --features=features/myFeature.feature --format=pretty
 ```
 
 ### Options
@@ -69,13 +69,20 @@ $ grunt cucumberjs --features=features/myFeature.feature --format=pretty
 Type: `String`
 Default: `''`
 
-passes the value as ```--steps``` parameter to cucumber.
+Passes the value as ```--steps``` parameter to cucumber.
 
-#### options.tags
+#### options.require
 Type: `String`
 Default: `''`
 
-passes the value as ```--tags``` parameter to cucumber.
+Passes the value as ```--require``` parameter to cucumber. If an array, each item is passed as a separate ```--require``` parameter.
+Use if step_definitions and hooks are NOT in default location of ```features/step_definitions```
+
+#### options.tags
+Type: `String|Array`
+Default: `''`
+
+Passes the value as ```--tags``` parameter to cucumber. If an array, each item is passed as a separate ```--tags``` parameter.
 
 #### options.theme
 Type: `String`
@@ -108,3 +115,38 @@ Available: `['true', 'false']`
 
 To keep or not the generated json file, applicable for options.format = html only.
 It will be saved as options.output + '.json'
+
+#### options.debug
+Type: `Boolean`
+Default: `'false'`
+Available: `['true', 'false']`
+
+A flag to turn console log on or off
+
+### Attaching Screenshots to grunt-cucumberjs HTML report
+
+If you are using [WebDriverJS][1] (or related framework) along with [cucumber-js][2] for browser automation, you can attach screenshots to grunt-cucumberjs HTML report. Typically screenshots are taken after a test failure to help debug what went wrong when analyzing results, for example
+
+```javascript
+this.After(function (scenario, callback) {
+        if(scenario.isFailed()){
+            driver.takeScreenshot().then(function (buffer) {
+                scenario.attach(new Buffer(buffer, 'base64').toString('binary'), 'image/png');
+                 driver.quit().then(function () {
+                                callback();
+                 });
+            });
+        }
+});
+```
+Below are some sample HTML reports with screenshots (note that javascript to collapse/expand a screenshots doesn't appear to respond in htmlpreview site below, but they should work fine on locally generated reports,
+
+1. [Bootstrap Theme Reports][3]
+2. [Simple Theme Reports][4]
+3. [Foundation Theme Reports][5]
+
+[1]: https://code.google.com/p/selenium/wiki/WebDriverJs "WebDriverJS"
+[2]: https://github.com/cucumber/cucumber-js "cucumber-js"
+[3]: http://htmlpreview.github.io/?https://github.com/nikulkarni/grunt-cucumberjs/blob/screenshot/report/cucumber_report_bootstrap.html "Bootstrap Theme Reports"
+[4]: http://htmlpreview.github.io/?https://github.com/nikulkarni/grunt-cucumberjs/blob/screenshot/report/cucumber_report_simple.html "Simple Theme Reports"
+[5]: http://htmlpreview.github.io/?https://github.com/nikulkarni/grunt-cucumberjs/blob/screenshot/report/cucumber_report_foundation.html "Foundation Theme Reports"

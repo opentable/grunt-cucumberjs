@@ -7,16 +7,17 @@
 */
 
 'use strict';
-
+var fs = require('fs');
 module.exports = function(grunt) {
 
   var version = grunt.file.readJSON('./package.json').version;
   var projectPkg = grunt.file.readJSON('package.json');
   var spawn = require('child_process').spawn;
   var _ = require('underscore');
+  var commondir = require('commondir');
 
-  var WIN32_BIN_PATH = '.\\node_modules\\.bin\\cucumber-js.cmd';
-  var UNIX_BIN_PATH = './node_modules/cucumber/bin/cucumber.js';
+  var WIN32_BIN_PATH = 'node_modules\\.bin\\cucumber-js.cmd';
+  var UNIX_BIN_PATH = 'node_modules/cucumber/bin/cucumber.js';
 
   grunt.registerMultiTask('cucumberjs', 'Run cucumber.js features', function() {
     var done = this.async();
@@ -27,7 +28,9 @@ module.exports = function(grunt) {
       saveJson: false,
       theme: 'foundation',
       templateDir: 'features/templates',
-      tags: ''
+      tags: '',
+      require: '',
+      debug: false
     });
 
     // resolve options set via cli
@@ -44,13 +47,33 @@ module.exports = function(grunt) {
     }
 
     if (options.tags) {
-      commands.push('-t', options.tags);
+      if (options.tags instanceof Array) {
+        options.tags.forEach(function(element, index, array) {
+          commands.push('-t', element);
+        });
+      } else {
+        commands.push('-t', options.tags);
+      }
     }
 
     if (options.format === 'html') {
       commands.push('-f', 'json');
     } else {
       commands.push('-f', options.format);
+    }
+
+    if (options.require) {
+      if (options.require instanceof Array) {
+        options.require.forEach(function(element, index, array) {
+          commands.push('--require', element);
+        });
+      } else {
+        commands.push('--require', options.require);
+      }
+    }
+
+    if(grunt.option('require')) {
+      commands.push('--require', grunt.option('require'));
     }
 
     if (grunt.option('features')) {
@@ -87,6 +110,9 @@ module.exports = function(grunt) {
 
     cucumber.stdout.on('data', function(data) {
       if (options.format === 'html') {
+        if (options.debug) {
+         process.stdout.write(data);
+        }
         buffer.push(data);
       } else {
         grunt.log.write(data);
@@ -94,6 +120,9 @@ module.exports = function(grunt) {
     });
 
     cucumber.stderr.on('data', function (data) {
+      if (options.debug) {
+         process.stdout.write(data);
+      }
       var stderr = new Buffer(data);
       grunt.log.error(stderr.toString());
     });
@@ -104,7 +133,7 @@ module.exports = function(grunt) {
 
         var output = Buffer.concat(buffer).toString();
 
-        var featureStartIndex = output.substring(0, output.indexOf('"keyword": "Feature"')).lastIndexOf('[');
+        var featureStartIndex = output.search(/\[\s*{\s*\"id\"/g);
 
         var logOutput = output.substring(0, featureStartIndex - 1);
 
@@ -137,10 +166,17 @@ module.exports = function(grunt) {
     */
     var setStats = function(suite) {
       var features = suite.features;
-
+      var rootDir = commondir(_.pluck(features, 'uri'));
+      var scrshotDir;
+      if(options.output.lastIndexOf('/')>-1) {
+        scrshotDir  = options.output.substring(0, options.output.lastIndexOf('/')) + '/screenshot/';
+      } else {
+        scrshotDir = 'screenshot/';
+      }
       features.forEach(function(feature) {
         feature.passed = 0;
         feature.failed = 0;
+        feature.relativeFolder = feature.uri.slice(rootDir.length);
 
         if(!feature.elements) {
           return;
@@ -153,6 +189,24 @@ module.exports = function(grunt) {
           element.skipped = 0;
 
           element.steps.forEach(function(step) {
+            if (step.embeddings !== undefined) {
+              if(!fs.existsSync(scrshotDir)){
+                fs.mkdirSync(scrshotDir);
+              }
+              var stepData = step.embeddings[0],
+                  name= step.name && step.name.split(' ').join('_')|| step.keyword.trim(),
+                  name = name + Math.round(Math.random() * 10000) + '.png', //randomize the file name
+                  filename = scrshotDir + name;
+              fs.writeFile(filename, new Buffer(stepData.data, 'base64'), function(err) {
+                  if(err){
+                    console.error('Error saving screenshot '+filename); //asynchronously save screenshot
+                  }
+              });
+              step.image = 'screenshot/'+ name;
+            }
+            if(!step.result) {
+              return 0;
+            }
             if(step.result.status === 'passed') {
               return element.passed++;
             }
@@ -169,13 +223,17 @@ module.exports = function(grunt) {
           if(element.failed > 0) {
             return feature.failed++;
           }
-          feature.passed++;
+          if (element.passed > 0) {
+            return feature.passed++;
+          }
         });
 
         if(feature.failed > 0) {
           return suite.failed++;
         }
-        suite.passed++;
+        if(feature.passed > 0) {
+          return suite.passed++;
+        }
       });
 
       suite.features = features;

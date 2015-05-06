@@ -1,5 +1,8 @@
 Feature: Test Feature
-  Test Description
+  Test Description with a bracket [
+
+  Background: 
+    Given I have a background element
 
   Scenario: Test Scenario 1
     Given I have a test scenario
