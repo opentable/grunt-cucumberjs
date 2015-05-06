@@ -133,7 +133,7 @@ module.exports = function(grunt) {
 
         var output = Buffer.concat(buffer).toString();
 
-        var featureStartIndex = output.substring(0, output.indexOf('"keyword": "Feature"')).lastIndexOf('[');
+        var featureStartIndex = output.search(/\[\s*{\s*\"id\"/g);
 
         var logOutput = output.substring(0, featureStartIndex - 1);
 
